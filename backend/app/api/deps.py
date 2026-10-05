@@ -2,6 +2,7 @@ import uuid
 from collections.abc import Callable
 
 from fastapi import Cookie, Depends, Header, Request, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,6 +13,8 @@ from app.core.security import decode_access_token
 from app.db.enums import UserRole
 from app.db.models.auth import User
 from app.db.session import get_db
+
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def set_auth_cookies(
@@ -90,10 +93,13 @@ async def get_current_user(
     request: Request,
     session: AsyncSession = Depends(get_db),
     access_token_cookie: str | None = Cookie(default=None, alias="access_token"),
+    auth_credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     authorization: str | None = Header(default=None),
 ) -> User:
     token = None
-    if access_token_cookie:
+    if auth_credentials:
+        token = auth_credentials.credentials
+    elif access_token_cookie:
         token = access_token_cookie
     elif authorization and authorization.startswith("Bearer "):
         token = authorization[7:].strip()

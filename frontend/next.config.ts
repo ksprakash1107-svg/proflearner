@@ -14,6 +14,22 @@ const nextConfig: NextConfig = {
         source: "/health/:path*",
         destination: `${backendUrl}/health/:path*`,
       },
+      {
+        source: "/docs",
+        destination: `${backendUrl}/docs`,
+      },
+      {
+        source: "/docs/:path*",
+        destination: `${backendUrl}/docs/:path*`,
+      },
+      {
+        source: "/openapi.json",
+        destination: `${backendUrl}/openapi.json`,
+      },
+      {
+        source: "/redoc",
+        destination: `${backendUrl}/redoc`,
+      },
     ];
   },
   async headers() {

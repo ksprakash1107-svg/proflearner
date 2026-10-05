@@ -1,0 +1,97 @@
+from enum import StrEnum
+
+
+class UserRole(StrEnum):
+    ADMIN = "ADMIN"
+    PROFESSOR = "PROFESSOR"
+    STUDENT = "STUDENT"
+
+
+class CourseStatus(StrEnum):
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    ARCHIVED = "ARCHIVED"
+
+
+class DocumentStatus(StrEnum):
+    UPLOADED = "UPLOADED"
+    PROCESSING = "PROCESSING"
+    PROCESSED = "PROCESSED"
+    FAILED = "FAILED"
+    ARCHIVED = "ARCHIVED"
+
+
+class LectureStatus(StrEnum):
+    GENERATING = "GENERATING"
+    DRAFT = "DRAFT"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    APPROVED = "APPROVED"
+    PUBLISHED = "PUBLISHED"
+    FAILED = "FAILED"
+    ARCHIVED = "ARCHIVED"
+
+
+class LectureAudioStatus(StrEnum):
+    NOT_STARTED = "NOT_STARTED"
+    GENERATING = "GENERATING"
+    READY = "READY"
+    PARTIAL = "PARTIAL"
+
+
+class AudioItemStatus(StrEnum):
+    PENDING = "PENDING"
+    GENERATING = "GENERATING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
+class SlideType(StrEnum):
+    INTRO = "INTRO"
+    CONTENT = "CONTENT"
+    EXAMPLE = "EXAMPLE"
+    SUMMARY = "SUMMARY"
+
+
+class JobType(StrEnum):
+    PROCESS_DOCUMENT = "PROCESS_DOCUMENT"
+    GENERATE_LECTURE = "GENERATE_LECTURE"
+    GENERATE_AUDIO = "GENERATE_AUDIO"
+    DELETE_STORAGE_OBJECTS = "DELETE_STORAGE_OBJECTS"
+
+
+class JobStatus(StrEnum):
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class EnrollmentStatus(StrEnum):
+    ENROLLED = "ENROLLED"
+    UNENROLLED = "UNENROLLED"
+
+
+class ProgressStatus(StrEnum):
+    NOT_STARTED = "NOT_STARTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+
+
+class AnswerType(StrEnum):
+    GROUNDED = "GROUNDED"
+    PARTIALLY_GROUNDED = "PARTIALLY_GROUNDED"
+    NOT_IN_MATERIAL = "NOT_IN_MATERIAL"
+    OFF_TOPIC = "OFF_TOPIC"
+
+
+class AIPurpose(StrEnum):
+    DOCUMENT_ANALYSIS = "DOCUMENT_ANALYSIS"
+    STRUCTURE = "STRUCTURE"
+    OUTLINE = "OUTLINE"
+    SLIDES = "SLIDES"
+    NARRATION = "NARRATION"
+    SUMMARY = "SUMMARY"
+    EMBEDDING = "EMBEDDING"
+    QA = "QA"
+    TTS = "TTS"

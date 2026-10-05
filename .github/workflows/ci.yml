@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-checks:
+    name: Backend Lint & Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: proflearn
+          POSTGRES_PASSWORD: proflearn
+          POSTGRES_DB: proflearn
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          uv sync --extra dev
+
+      - name: Ruff Lint & Format Check
+        working-directory: backend
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Run Alembic Migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://proflearn:proflearn@localhost:5432/proflearn
+          AUTH_SECRET: test-secret-at-least-32-characters-long-12345
+        run: |
+          uv run alembic upgrade head
+
+      - name: Run Unit & Integration Tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://proflearn:proflearn@localhost:5432/proflearn
+          AUTH_SECRET: test-secret-at-least-32-characters-long-12345
+          AI_PROVIDER: fake
+          APP_ENV: test
+        run: |
+          uv run pytest --cov=app tests/
+
+  frontend-checks:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 12
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: frontend
+        run: pnpm exec tsc --noEmit
+
+      - name: Build Next.js
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: pnpm run build

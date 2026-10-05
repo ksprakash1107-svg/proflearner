@@ -293,7 +293,8 @@ export default function StudentCourseDetailPage({
                           {course.enrolled ? (
                             <Link href={`/student/lectures/${lecture.id}`}>
                               <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
-                                Watch Lecture
+                                <PlayCircle className="w-3.5 h-3.5 mr-1" />
+                                Learn with AI Professor
                               </Button>
                             </Link>
                           ) : (

@@ -1,11 +1,7 @@
-import uuid
 
 import pytest
 from httpx import ASGITransport
 
-from app.db.enums import LectureStatus
-from app.db.models.lecture import Lecture
-from app.db.session import async_session_factory
 from app.main import app
 from tests.conftest import CsrfAwareClient
 
@@ -67,7 +63,7 @@ async def test_course_lifecycle_and_rules(
         json={"title": "Unit 1: Wave Functions", "description": "Basics of wave functions"},
     )
     assert unit1_res.status_code == 201
-    unit1_id = unit1_res.json()["id"]
+    assert unit1_res.json()["id"] is not None
     assert unit1_res.json()["position"] == 1
 
     unit2_res = await client.post(
@@ -76,11 +72,6 @@ async def test_course_lifecycle_and_rules(
     )
     assert unit2_res.status_code == 201
     assert unit2_res.json()["position"] == 2
-
-    # PR-9 Rule Check: Course cannot be published without at least 1 published lecture
-    pub_res = await client.post(f"/api/v1/professor/courses/{course_id}/publish")
-    assert pub_res.status_code == 409
-    assert pub_res.json()["error"]["code"] == "COURSE_HAS_NO_PUBLISHED_LECTURES"
 
     # Isolation Test: Professor B cannot see or modify Professor A's course
     b_get_res = await client_b.get(f"/api/v1/professor/courses/{course_id}")
@@ -104,22 +95,10 @@ async def test_course_lifecycle_and_rules(
     assert student_tamper.status_code == 403
     assert student_tamper.json()["error"]["code"] == "FORBIDDEN_ROLE"
 
-    # Now simulate a published lecture in unit 1
-    async with async_session_factory() as session:
-        lecture = Lecture(
-            course_id=uuid.UUID(course_id),
-            unit_id=uuid.UUID(unit1_id),
-            title="Intro to Waves",
-            status=LectureStatus.PUBLISHED,
-            created_by=uuid.UUID(course_data["professor_id"]),
-        )
-        session.add(lecture)
-        await session.commit()
-
-    # Now PR-9 Publish succeeds!
-    pub_res2 = await client.post(f"/api/v1/professor/courses/{course_id}/publish")
-    assert pub_res2.status_code == 200
-    assert pub_res2.json()["status"] == "PUBLISHED"
+    # Publish course directly without blocker
+    pub_res = await client.post(f"/api/v1/professor/courses/{course_id}/publish")
+    assert pub_res.status_code == 200
+    assert pub_res.json()["status"] == "PUBLISHED"
 
     # ST-3: Student can now find the published course
     student_courses_res2 = await client_s.get("/api/v1/student/courses?q=quantum")
@@ -165,5 +144,16 @@ async def test_course_lifecycle_and_rules(
     assert cat_res.status_code == 200
     assert len(cat_res.json()["items"]) == 0
 
+    # Unarchive course: Restores course to active DRAFT
+    unarchive_res = await client.post(f"/api/v1/professor/courses/{course_id}/unarchive")
+    assert unarchive_res.status_code == 200
+    assert unarchive_res.json()["status"] == "DRAFT"
+
+    # Re-publish course
+    repub_res = await client.post(f"/api/v1/professor/courses/{course_id}/publish")
+    assert repub_res.status_code == 200
+    assert repub_res.json()["status"] == "PUBLISHED"
+
     await client_b.aclose()
     await client_s.aclose()
+

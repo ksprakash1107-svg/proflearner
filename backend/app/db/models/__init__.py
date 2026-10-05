@@ -8,7 +8,8 @@ from app.db.models.auth import (
     User,
 )
 from app.db.models.course import Course, CourseUnit, Enrollment
-from app.db.models.lecture import Lecture
+from app.db.models.document import Document
+from app.db.models.lecture import Lecture, Slide
 
 __all__ = [
     "User",
@@ -22,4 +23,6 @@ __all__ = [
     "CourseUnit",
     "Enrollment",
     "Lecture",
+    "Slide",
+    "Document",
 ]

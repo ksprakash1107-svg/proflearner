@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, FolderPlus, Loader2, PlayCircle, Settings, Users } from "lucide-react";
+import { ArchiveRestore, BookOpen, FolderPlus, Loader2, PlayCircle, Settings, Users } from "lucide-react";
 
 interface CourseSummary {
   id: string;
@@ -29,6 +29,7 @@ export default function ProfessorCoursesPage() {
   const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchCourses = React.useCallback(async () => {
     setIsLoading(true);
@@ -44,6 +45,18 @@ export default function ProfessorCoursesPage() {
       setIsLoading(false);
     }
   }, [statusFilter]);
+
+  const handleUnarchive = async (courseId: string) => {
+    try {
+      setActionError(null);
+      await apiClient(`/professor/courses/${courseId}/unarchive`, {
+        method: "POST",
+      });
+      fetchCourses();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to unarchive course.");
+    }
+  };
 
   useEffect(() => {
     fetchCourses();
@@ -159,11 +172,24 @@ export default function ProfessorCoursesPage() {
                 </div>
               </CardContent>
               <CardFooter className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <Link href={`/professor/courses/${course.id}`}>
-                  <Button variant="default" size="sm" className="text-xs bg-indigo-600 hover:bg-indigo-700">
-                    Manage Course
-                  </Button>
-                </Link>
+                <div className="flex items-center space-x-2">
+                  <Link href={`/professor/courses/${course.id}`}>
+                    <Button variant="default" size="sm" className="text-xs bg-indigo-600 hover:bg-indigo-700">
+                      Manage Course
+                    </Button>
+                  </Link>
+                  {course.status === "ARCHIVED" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs border-amber-300 text-amber-800 hover:bg-amber-50"
+                      onClick={() => handleUnarchive(course.id)}
+                    >
+                      <ArchiveRestore className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                      Unarchive
+                    </Button>
+                  )}
+                </div>
                 <Link href={`/professor/courses/${course.id}/settings`}>
                   <Button variant="ghost" size="sm" className="text-xs text-slate-600">
                     <Settings className="w-3.5 h-3.5 mr-1" />

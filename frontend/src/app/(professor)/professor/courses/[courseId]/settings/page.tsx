@@ -14,8 +14,9 @@ import {
   TeachingProfileData,
   TeachingProfileForm,
 } from "@/components/forms/TeachingProfileForm";
+import { Badge } from "@/components/ui/badge";
 import { ApiError } from "@/lib/api/errors";
-import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore, ArrowLeft, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 
 interface CourseDetail {
   id: string;
@@ -41,9 +42,11 @@ export default function CourseSettingsPage({
   const [department, setDepartment] = useState("");
   const [description, setDescription] = useState("");
   const [teachingProfile, setTeachingProfile] = useState<TeachingProfileData>(DEFAULT_TEACHING_PROFILE);
+  const [status, setStatus] = useState<string>("DRAFT");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -55,6 +58,7 @@ export default function CourseSettingsPage({
         setSubject(data.subject);
         setDepartment(data.department || "");
         setDescription(data.description || "");
+        setStatus(data.status);
         if (data.teaching_profile) {
           setTeachingProfile({
             ...DEFAULT_TEACHING_PROFILE,
@@ -98,6 +102,49 @@ export default function CourseSettingsPage({
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUnarchive = async () => {
+    setIsArchiving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const data = await apiClient<CourseDetail>(`/professor/courses/${courseId}/unarchive`, {
+        method: "POST",
+      });
+      setStatus(data.status);
+      setSuccessMessage("Course unarchived successfully. It is now active as a draft.");
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("Failed to unarchive course.");
+      }
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!confirm("Are you sure you want to archive this course?")) return;
+    setIsArchiving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const data = await apiClient<CourseDetail>(`/professor/courses/${courseId}/archive`, {
+        method: "POST",
+      });
+      setStatus(data.status);
+      setSuccessMessage("Course archived successfully.");
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("Failed to archive course.");
+      }
+    } finally {
+      setIsArchiving(false);
     }
   };
 
@@ -246,6 +293,74 @@ export default function CourseSettingsPage({
             </Button>
           </CardFooter>
         </form>
+      </Card>
+
+      {/* Course Lifecycle & Archival Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Course Lifecycle & Visibility</CardTitle>
+              <CardDescription>Control whether this course is active or archived</CardDescription>
+            </div>
+            <Badge
+              variant={
+                status === "PUBLISHED"
+                  ? "success"
+                  : status === "ARCHIVED"
+                  ? "secondary"
+                  : "warning"
+              }
+            >
+              {status}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900">
+                {status === "ARCHIVED" ? "Course is Archived" : "Archive this Course"}
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {status === "ARCHIVED"
+                  ? "This course is hidden from students. Unarchive it to restore access."
+                  : "Archiving hides this course from students while preserving all uploaded content and slides."}
+              </p>
+            </div>
+
+            {status === "ARCHIVED" ? (
+              <Button
+                type="button"
+                onClick={handleUnarchive}
+                disabled={isArchiving}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs flex-shrink-0"
+              >
+                {isArchiving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                ) : (
+                  <ArchiveRestore className="w-3.5 h-3.5 mr-1" />
+                )}
+                Unarchive Course
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleArchive}
+                disabled={isArchiving}
+                className="text-xs text-amber-800 border-amber-300 hover:bg-amber-50 flex-shrink-0"
+              >
+                {isArchiving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                ) : (
+                  <Archive className="w-3.5 h-3.5 mr-1" />
+                )}
+                Archive Course
+              </Button>
+            )}
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

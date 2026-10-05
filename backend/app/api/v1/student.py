@@ -9,12 +9,14 @@ from app.db.enums import UserRole
 from app.db.models.auth import User
 from app.db.session import get_db
 from app.schemas.course import CourseDTO, PaginatedCoursesDTO
+from app.schemas.lecture import LectureDetailDTO, TutorAnswerDTO, TutorAskRequest
 from app.schemas.student import (
     EnrollmentDTO,
     StudentDashboardDTO,
     StudentProfileDTO,
     StudentProfileUpdateRequest,
 )
+from app.services.lecture_service import lecture_service
 from app.services.student_service import StudentService
 
 router = APIRouter(prefix="/student", tags=["student"])
@@ -94,3 +96,32 @@ async def get_enrollments(
     session: AsyncSession = Depends(get_db),
 ) -> list[EnrollmentDTO]:
     return await student_service.get_student_enrollments(session, current_user.id)
+
+
+@router.get("/lectures/{lecture_id}", response_model=LectureDetailDTO)
+async def get_student_lecture(
+    lecture_id: uuid.UUID,
+    current_user: StudentUser,
+    session: AsyncSession = Depends(get_db),
+) -> LectureDetailDTO:
+    return await lecture_service.get_lecture(session=session, lecture_id=lecture_id)
+
+
+@router.post(
+    "/lectures/{lecture_id}/ask",
+    response_model=TutorAnswerDTO,
+    dependencies=[Depends(verify_csrf)],
+)
+async def ask_student_lecture_tutor(
+    lecture_id: uuid.UUID,
+    data: TutorAskRequest,
+    current_user: StudentUser,
+    session: AsyncSession = Depends(get_db),
+) -> TutorAnswerDTO:
+    return await lecture_service.ask_tutor(
+        session=session,
+        lecture_id=lecture_id,
+        slide_number=data.slide_number,
+        question=data.question,
+    )
+

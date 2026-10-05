@@ -61,3 +61,6 @@ scratch/
 tmp/
 *.log
 data/
+storage/
+backend/storage/
+

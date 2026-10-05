@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_role, verify_csrf
@@ -20,7 +20,9 @@ from app.schemas.course import (
     ProfessorProfileDTO,
     ProfessorProfileUpdateRequest,
 )
+from app.schemas.lecture import LectureDetailDTO, TutorAnswerDTO, TutorAskRequest
 from app.services.course_service import CourseService
+from app.services.lecture_service import lecture_service
 
 router = APIRouter(prefix="/professor", tags=["professor"])
 course_service = CourseService()
@@ -161,6 +163,19 @@ async def archive_course(
 
 
 @router.post(
+    "/courses/{course_id}/unarchive",
+    response_model=CourseDTO,
+    dependencies=[Depends(verify_csrf)],
+)
+async def unarchive_course(
+    course_id: uuid.UUID,
+    current_user: ProfessorUser,
+    session: AsyncSession = Depends(get_db),
+) -> CourseDTO:
+    return await course_service.unarchive_course(session, course_id, current_user.id)
+
+
+@router.post(
     "/courses/{course_id}/units",
     response_model=CourseUnitDTO,
     status_code=status.HTTP_201_CREATED,
@@ -201,3 +216,59 @@ async def delete_unit(
 ) -> Response:
     await course_service.delete_unit(session, unit_id, current_user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/courses/{course_id}/generate-from-pdf",
+    response_model=LectureDetailDTO,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verify_csrf)],
+)
+async def generate_presentation_from_pdf(
+    course_id: uuid.UUID,
+    file: UploadFile = File(...),
+    current_user: ProfessorUser = None,
+    session: AsyncSession = Depends(get_db),
+) -> LectureDetailDTO:
+    file_bytes = await file.read()
+    return await lecture_service.generate_from_pdf(
+        session=session,
+        course_id=course_id,
+        professor_id=current_user.id,
+        file_bytes=file_bytes,
+        filename=file.filename or "presentation.pdf",
+    )
+
+
+@router.get(
+    "/courses/{course_id}/lectures/{lecture_id}",
+    response_model=LectureDetailDTO,
+)
+async def get_professor_lecture(
+    course_id: uuid.UUID,
+    lecture_id: uuid.UUID,
+    current_user: ProfessorUser,
+    session: AsyncSession = Depends(get_db),
+) -> LectureDetailDTO:
+    return await lecture_service.get_lecture(session=session, lecture_id=lecture_id)
+
+
+@router.post(
+    "/courses/{course_id}/lectures/{lecture_id}/ask",
+    response_model=TutorAnswerDTO,
+    dependencies=[Depends(verify_csrf)],
+)
+async def ask_professor_lecture_tutor(
+    course_id: uuid.UUID,
+    lecture_id: uuid.UUID,
+    data: TutorAskRequest,
+    current_user: ProfessorUser,
+    session: AsyncSession = Depends(get_db),
+) -> TutorAnswerDTO:
+    return await lecture_service.ask_tutor(
+        session=session,
+        lecture_id=lecture_id,
+        slide_number=data.slide_number,
+        question=data.question,
+    )
+

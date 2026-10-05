@@ -72,8 +72,43 @@ class Lecture(Base, TimestampMixin):
     course = relationship("Course", lazy="selectin")
     unit = relationship("CourseUnit", lazy="selectin")
     author = relationship("User", foreign_keys=[created_by], lazy="selectin")
+    slides = relationship(
+        "Slide",
+        back_populates="lecture",
+        lazy="selectin",
+        order_by="Slide.slide_number",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_lectures_course_status", "course_id", "status"),
         Index("ix_lectures_unit_position", "unit_id", "position"),
     )
+
+
+class Slide(Base, TimestampMixin):
+    __tablename__ = "slides"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lecture_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("lectures.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    slide_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    narration_script: Mapped[str] = mapped_column(Text, nullable=False)
+    audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    source_page_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_page_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Relationships
+    lecture = relationship("Lecture", back_populates="slides", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_slides_lecture_number", "lecture_id", "slide_number", unique=True),
+    )
+

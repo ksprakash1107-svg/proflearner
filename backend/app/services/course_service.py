@@ -390,19 +390,7 @@ class CourseService:
                 message="This course has been moderated by an administrator and cannot be published.",
             )
 
-        # PR-9: Check at least one published lecture exists
-        lecture_check = select(func.count(Lecture.id)).where(
-            Lecture.course_id == course_id,
-            Lecture.status == LectureStatus.PUBLISHED,
-            Lecture.deleted_at.is_(None),
-        )
-        published_lectures = (await session.execute(lecture_check)).scalar() or 0
-        if published_lectures == 0:
-            raise ConflictError(
-                code="COURSE_HAS_NO_PUBLISHED_LECTURES",
-                message="Course must have at least one published lecture before it can be published.",
-            )
-
+        # Course can be published by the professor directly
         course.status = CourseStatus.PUBLISHED
         course.updated_at = datetime.now(UTC)
         await session.commit()
@@ -438,6 +426,23 @@ class CourseService:
             raise NotFoundError(code="COURSE_NOT_FOUND", message="Course not found.")
 
         course.status = CourseStatus.ARCHIVED
+        course.updated_at = datetime.now(UTC)
+        await session.commit()
+        return await self.get_professor_course(session, course_id, professor_id)
+
+    async def unarchive_course(
+        self, session: AsyncSession, course_id: uuid.UUID, professor_id: uuid.UUID
+    ) -> CourseDTO:
+        stmt = select(Course).where(
+            Course.id == course_id,
+            Course.professor_id == professor_id,
+            Course.deleted_at.is_(None),
+        )
+        course = (await session.execute(stmt)).scalar_one_or_none()
+        if not course:
+            raise NotFoundError(code="COURSE_NOT_FOUND", message="Course not found.")
+
+        course.status = CourseStatus.DRAFT
         course.updated_at = datetime.now(UTC)
         await session.commit()
         return await self.get_professor_course(session, course_id, professor_id)

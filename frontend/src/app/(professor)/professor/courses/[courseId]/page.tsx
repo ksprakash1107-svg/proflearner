@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api/errors";
 import {
   AlertCircle,
   Archive,
+  ArchiveRestore,
   ArrowLeft,
   CheckCircle2,
   FileText,
@@ -21,6 +22,7 @@ import {
   PlayCircle,
   Plus,
   Settings,
+  Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -76,6 +78,47 @@ export default function CourseDetailPage({
   const [unitTitle, setUnitTitle] = useState("");
   const [unitDescription, setUnitDescription] = useState("");
   const [isSavingUnit, setIsSavingUnit] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<string>("");
+
+  const handleFileUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    setIsGenerating(true);
+    setGenerationProgress("Reading PDF document and extracting content...");
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+      setGenerationProgress("AI is analyzing material and generating presentation slides with teaching narration...");
+      const res = await fetch(`/api/v1/professor/courses/${courseId}/generate-from-pdf`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson?.error?.message || "Failed to generate presentation from PDF.");
+      }
+
+      const newLecture = await res.json();
+      setSuccessMessage(`Successfully generated interactive presentation "${newLecture.title}" with ${newLecture.slide_count} slides!`);
+      setSelectedFile(null);
+      await fetchCourse();
+      router.push(`/professor/courses/${courseId}/lectures/${newLecture.id}`);
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to upload PDF and generate presentation.");
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress("");
+    }
+  };
 
   const fetchCourse = React.useCallback(async () => {
     setIsLoading(true);
@@ -150,6 +193,24 @@ export default function CourseDetailPage({
         setErrorMessage(err.message);
       } else {
         setErrorMessage("Failed to archive course.");
+      }
+    }
+  };
+
+  const handleUnarchive = async () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const updated = await apiClient<CourseDetail>(`/professor/courses/${courseId}/unarchive`, {
+        method: "POST",
+      });
+      setCourse(updated);
+      setSuccessMessage("Course unarchived successfully and restored to active draft.");
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("Failed to unarchive course.");
       }
     }
   };
@@ -275,6 +336,24 @@ export default function CourseDetailPage({
         </div>
       )}
 
+      {/* Archived Status Alert */}
+      {course.status === "ARCHIVED" && (
+        <div className="flex items-center justify-between rounded-xl bg-amber-50 p-4 text-sm text-amber-900 border border-amber-200">
+          <div className="flex items-center space-x-2">
+            <Archive className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <span>This course is archived and hidden from students. Click unarchive to restore it.</span>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleUnarchive}
+            className="bg-amber-600 hover:bg-amber-700 text-white text-xs ml-4 flex-shrink-0"
+          >
+            <ArchiveRestore className="w-3.5 h-3.5 mr-1" />
+            Unarchive Course
+          </Button>
+        </div>
+      )}
+
       {/* Course Header Banner */}
       <Card>
         <CardHeader className="pb-4">
@@ -328,7 +407,7 @@ export default function CourseDetailPage({
                 </Button>
               )}
 
-              {course.status !== "ARCHIVED" && (
+              {course.status !== "ARCHIVED" ? (
                 <Button
                   onClick={handleArchive}
                   variant="outline"
@@ -336,6 +415,14 @@ export default function CourseDetailPage({
                 >
                   <Archive className="w-3.5 h-3.5 mr-1" />
                   Archive
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleUnarchive}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                >
+                  <ArchiveRestore className="w-3.5 h-3.5 mr-1" />
+                  Unarchive Course
                 </Button>
               )}
 
@@ -357,6 +444,73 @@ export default function CourseDetailPage({
             </div>
           </div>
         </CardHeader>
+      </Card>
+
+      {/* AI Presentation Generator Box */}
+      <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50/50 via-white to-purple-50/30 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-5 h-5 text-indigo-600" />
+            <CardTitle className="text-base sm:text-lg font-bold">
+              AI Presentation Generator
+            </CardTitle>
+          </div>
+          <CardDescription className="text-xs sm:text-sm">
+            Upload your course PDF (notes, book chapter, or slides). The AI will immediately parse the text, generate structured presentation slides, write a natural teaching script, and let you teach it with voice.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleFileUpload} className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <label
+                htmlFor="pdfUpload"
+                className="flex-1 flex items-center justify-center border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-4 bg-white cursor-pointer transition text-center group"
+              >
+                <Upload className="w-5 h-5 text-indigo-600 mr-2 group-hover:scale-110 transition-transform" />
+                <span className="text-xs sm:text-sm font-medium text-slate-700 truncate max-w-md">
+                  {selectedFile ? selectedFile.name : "Choose or drag a course PDF document (max 25MB)..."}
+                </span>
+                <input
+                  id="pdfUpload"
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setSelectedFile(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                  disabled={isGenerating}
+                />
+              </label>
+
+              <Button
+                type="submit"
+                disabled={!selectedFile || isGenerating}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs sm:text-sm h-12 px-6 flex-shrink-0"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating Presentation...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate & Teach Presentation
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {isGenerating && generationProgress && (
+              <div className="flex items-center space-x-2 text-xs text-indigo-700 font-medium bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>{generationProgress}</span>
+              </div>
+            )}
+          </form>
+        </CardContent>
       </Card>
 
       {/* Units Section */}
@@ -501,25 +655,42 @@ export default function CourseDetailPage({
                 <CardContent className="pt-0 pb-4">
                   {unit.lectures.length === 0 ? (
                     <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 flex items-center justify-between">
-                      <span>No lectures in this unit yet.</span>
+                      <span>No presentations in this unit yet.</span>
                       <span className="text-[11px] text-indigo-600 font-medium">
-                        Upload a PDF to generate a lecture (Phase 3)
+                        Upload a PDF above to generate your presentation slides!
                       </span>
                     </div>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       {unit.lectures.map((lec) => (
                         <div
                           key={lec.id}
-                          className="flex items-center justify-between p-2 rounded-lg bg-slate-50 text-xs"
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100/80 transition border border-slate-200/60 gap-3"
                         >
-                          <div className="flex items-center space-x-2">
-                            <PlayCircle className="w-3.5 h-3.5 text-indigo-600" />
-                            <span className="font-medium text-slate-900">{lec.title}</span>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                              <PlayCircle className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-900 text-xs sm:text-sm block">
+                                {lec.title}
+                              </span>
+                              <span className="text-[11px] text-slate-500">
+                                {lec.slide_count} Slides · ~{Math.max(1, Math.round(lec.total_duration_seconds / 60))} mins
+                              </span>
+                            </div>
                           </div>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {lec.status}
-                          </Badge>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant={lec.status === "PUBLISHED" ? "success" : "secondary"} className="text-[10px]">
+                              {lec.status}
+                            </Badge>
+                            <Link href={`/professor/courses/${courseId}/lectures/${lec.id}`}>
+                              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8">
+                                <PlayCircle className="w-3.5 h-3.5 mr-1" />
+                                Teach Presentation
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import { DevMasterTool } from "@/components/dev/DevMasterTool";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,6 +24,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <Toaster position="top-right" richColors />
+          <DevMasterTool />
         </AuthProvider>
       </body>
     </html>

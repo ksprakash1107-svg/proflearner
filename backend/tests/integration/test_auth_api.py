@@ -198,3 +198,27 @@ async def test_password_change_and_reset(client: AsyncClient) -> None:
     async with async_session_factory() as session:
         logs = await session.execute(select(AuditLog).where(AuditLog.action == "PASSWORD_CHANGED"))
         assert len(logs.scalars().all()) >= 1
+
+
+@pytest.mark.asyncio
+async def test_dev_bypass_endpoints(client: AsyncClient):
+    # 1. Dev bypass as Professor
+    prof_res = await client.post("/api/v1/auth/dev-bypass", json={"role": "PROFESSOR"})
+    assert prof_res.status_code == 200
+    prof_data = prof_res.json()
+    assert prof_data["role"] == "PROFESSOR"
+    assert prof_data["email"] == "dev_professor@proflearn.local"
+    assert "access_token" in prof_res.cookies
+
+    # 2. Authenticated GET /auth/me succeeds with bypass cookie
+    me_res = await client.get("/api/v1/auth/me")
+    assert me_res.status_code == 200
+    assert me_res.json()["role"] == "PROFESSOR"
+
+    # 3. Dev bypass as Student
+    student_res = await client.post("/api/v1/auth/dev-bypass", json={"role": "STUDENT"})
+    assert student_res.status_code == 200
+    student_data = student_res.json()
+    assert student_data["role"] == "STUDENT"
+    assert student_data["email"] == "dev_student@proflearn.local"
+

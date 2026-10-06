@@ -502,3 +502,72 @@ class AuthService:
             request=request,
         )
         await session.commit()
+
+    async def dev_bypass(
+        self, session: AsyncSession, role: str, request: Request | None = None
+    ) -> tuple[UserDTO, str, str, str]:
+        role_upper = role.upper()
+        if role_upper not in ("PROFESSOR", "STUDENT", "ADMIN"):
+            role_upper = "PROFESSOR"
+
+        email = f"dev_{role_upper.lower()}@proflearn.local"
+        if role_upper == "ADMIN":
+            email = self.settings.ADMIN_SEED_EMAIL
+
+        stmt = (
+            select(User)
+            .where(User.email == email)
+            .options(selectinload(User.professor_profile), selectinload(User.student_profile))
+        )
+        user = (await session.execute(stmt)).scalar_one_or_none()
+
+        if not user:
+            user = User(
+                email=email,
+                password_hash=hash_password("DevMaster123!"),
+                full_name=f"Master Dev {role_upper.capitalize()}",
+                role=role_upper,
+                is_active=True,
+            )
+            session.add(user)
+            await session.flush()
+
+            if role_upper == "PROFESSOR":
+                prof_profile = ProfessorProfile(
+                    user_id=user.id,
+                    title="Distinguished Professor",
+                    institution="ProfLearn University",
+                    department="Computer Science & Engineering",
+                    bio="Master Dev Professor for local testing & interactive AI teaching.",
+                )
+                session.add(prof_profile)
+            elif role_upper == "STUDENT":
+                student_profile = StudentProfile(
+                    user_id=user.id,
+                    program="Computer Science B.S.",
+                )
+                session.add(student_profile)
+            await session.commit()
+
+            user = (await session.execute(stmt)).scalar_one()
+
+        # Generate fresh tokens
+        now = datetime.now(UTC)
+        raw_refresh, token_hash = generate_secure_token()
+        refresh_row = RefreshToken(
+            user_id=user.id,
+            family_id=uuid.uuid4(),
+            token_hash=token_hash,
+            expires_at=now + timedelta(days=self.settings.REFRESH_TOKEN_TTL_DAYS),
+        )
+        session.add(refresh_row)
+        user.last_login_at = now
+        await session.commit()
+
+        user_loaded = (await session.execute(stmt)).scalar_one()
+        access_token = create_access_token(
+            user_loaded.id, user_loaded.role, user_loaded.token_version
+        )
+        csrf_token = generate_csrf_token()
+        return self.user_to_dto(user_loaded), access_token, raw_refresh, csrf_token
+

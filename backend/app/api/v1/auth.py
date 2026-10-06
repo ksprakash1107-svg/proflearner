@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import clear_auth_cookies, get_current_user, set_auth_cookies, verify_csrf
@@ -142,3 +143,25 @@ async def change_password(
     session: AsyncSession = Depends(get_db),
 ) -> None:
     await auth_service.change_password(session=session, user=user, data=data, request=request)
+
+
+class DevBypassRequest(BaseModel):
+    role: str = "PROFESSOR"
+
+
+@router.post(
+    "/dev-bypass",
+    response_model=UserDTO,
+)
+async def dev_bypass(
+    data: DevBypassRequest,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_db),
+) -> UserDTO:
+    user_dto, access_token, refresh_token, csrf_token = await auth_service.dev_bypass(
+        session=session, role=data.role, request=request
+    )
+    set_auth_cookies(response, access_token, refresh_token, csrf_token)
+    return user_dto
+
